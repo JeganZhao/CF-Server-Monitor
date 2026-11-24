@@ -667,7 +667,17 @@ export async function saveMetricsHistory(db, serverId, historyPartitionId, metri
     metrics.ip_v6 || '0',
     metrics.boot_time || '',
     parseFloat(metrics.net_rx_monthly) || 0,
-    parseFloat(metrics.net_tx_monthly) || 0
+    parseFloat(metrics.net_tx_monthly) || 0,
+    metrics.hostname || '',
+    metrics.panel_version || '',
+    metrics.xray_version || '',
+    metrics.xray_state || '',
+    parseInt(metrics.online_clients) || 0,
+    metrics.online_client_emails || '',
+    parseInt(metrics.xui_inbounds_disabled) || 0,
+    parseInt(metrics.xui_inbounds_depleted) || 0,
+    parseInt(metrics.xui_clients_disabled) || 0,
+    parseInt(metrics.xui_clients_depleted) || 0
     ).run();
   };
 

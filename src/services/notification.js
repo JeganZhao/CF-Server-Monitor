@@ -1,4 +1,4 @@
-import { getLatestTimestampsForAllServers } from '../database/schema.js';
+import { getLatestMetrics, getLatestTimestampsForAllServers } from '../database/schema.js';
 import { clearServersListCache, getAllServers } from '../utils/cache.js';
 import {
   DEFAULT_NOTIFICATION_TEMPLATE,
@@ -1423,4 +1423,177 @@ export async function checkExpiringServers(db, options = {}) {
     console.error('到期检测失败:', e);
     return false;
   }
+}
+
+// 每日报告：每天 08:00（按 notification_timezone）发一份面板风格的日报。
+// 账号 cron 触发器已满，不新增；由每小时 cron（0 * * * *）在 08:00 那次触发。
+// 与到期提醒同一套时区判定写法（getZonedDateParts）。
+const DAILY_REPORT_HOUR = 8;
+const DAILY_REPORT_SENT_KEY = 'daily_report_last_sent';
+const DAILY_REPORT_STALE_MS = 10 * 60 * 1000;
+
+export function isDailyReportTimeDue(settings = {}, timestamp = Date.now()) {
+  const parts = getZonedDateParts(timestamp, settings.notification_timezone);
+  if (!parts) return false;
+  return Number(parts.hour) === DAILY_REPORT_HOUR;
+}
+
+function parseDailyReportBootTimeMs(bootTime) {
+  if (bootTime === null || bootTime === undefined || bootTime === '') return null;
+  if (typeof bootTime === 'string' && !/^\d+$/.test(bootTime)) {
+    const parsed = new Date(bootTime);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+  }
+  const timestamp = Number.parseInt(bootTime, 10);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+  return timestamp < 1000000000000 ? timestamp * 1000 : timestamp;
+}
+
+function formatDailyReportUptime(bootTime, now, settings = {}) {
+  const bootTimeMs = parseDailyReportBootTimeMs(bootTime);
+  if (!bootTimeMs) return null;
+  const diffMs = now - bootTimeMs;
+  if (diffMs < 0) return null;
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const zh = String(settings?.notification_language || 'zh').startsWith('zh');
+  const parts = [];
+  if (days > 0) parts.push(zh ? `${days}天` : `${days}d`);
+  if (hours > 0) parts.push(zh ? `${hours}小时` : `${hours}h`);
+  if (minutes > 0) parts.push(zh ? `${minutes}分` : `${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(zh ? `${seconds}秒` : `${seconds}s`);
+  return parts.slice(0, 3).join(' ');
+}
+
+function formatDailyReportSize(mb) {
+  const number = Number(mb);
+  if (!Number.isFinite(number) || number < 0) return '0.00MB';
+  if (number >= 1024) return `${(number / 1024).toFixed(2)}GB`;
+  return `${number.toFixed(2)}MB`;
+}
+
+function formatDailyReportTrafficGb(bytes) {
+  const number = Number(bytes);
+  if (!Number.isFinite(number) || number < 0) return '0.00GB';
+  return `${(number / GB).toFixed(2)}GB`;
+}
+
+function formatDailyReportLoad(loadAvg) {
+  const parts = String(loadAvg || '0 0 0').trim().split(/\s+/).filter(Boolean).slice(0, 3);
+  while (parts.length < 3) parts.push('0');
+  return parts.join('，');
+}
+
+function formatDailyReportCount(value) {
+  const number = parseInt(value, 10);
+  return Math.max(0, Number.isFinite(number) ? number : 0);
+}
+
+// 日报正文按面板 @daily 的样子拼（模板会在外层再包一层标题和时间）。
+export function buildDailyReportMessage(server, metrics, settings = {}, now = Date.now()) {
+  const messages = getNotificationMessages(settings);
+  const lines = [];
+  const hostname = String(metrics?.hostname || '').trim();
+  const panelVersion = String(metrics?.panel_version || '').trim();
+  const xrayVersion = String(metrics?.xray_version || '').trim();
+  const hasXui = !!(hostname || panelVersion);
+  if (hostname) lines.push(`主机：${hostname}`);
+  if (panelVersion) lines.push(`X-UI 版本：${panelVersion}`);
+  if (xrayVersion) lines.push(`Xray 版本：${xrayVersion}`);
+  const ipV4 = String(metrics?.ip_v4 || '').trim();
+  if (ipV4 && ipV4 !== '0') lines.push(`IPv4：${ipV4}`);
+  const ipV6 = String(metrics?.ip_v6 || '').trim();
+  if (ipV6 && ipV6 !== '0') lines.push(`IPv6：${ipV6}`);
+  const uptime = formatDailyReportUptime(metrics?.boot_time, now, settings);
+  lines.push(`服务器运行：${uptime || '未知'}`);
+  lines.push(`服务器负载：${formatDailyReportLoad(metrics?.load_avg)}`);
+  lines.push(`内存：${formatDailyReportSize(metrics?.ram_used)}/${formatDailyReportSize(metrics?.ram_total)}`);
+  if (hasXui) lines.push(`在线客户：${formatDailyReportCount(metrics?.online_clients)}`);
+  lines.push(`TCP：${formatDailyReportCount(metrics?.tcp_conn)}`);
+  lines.push(`UDP：${formatDailyReportCount(metrics?.udp_conn)}`);
+  const rx = Number(metrics?.net_rx) || 0;
+  const tx = Number(metrics?.net_tx) || 0;
+  lines.push(`流量：${formatDailyReportTrafficGb(rx + tx)}（↑${formatDailyReportTrafficGb(tx)}，↓${formatDailyReportTrafficGb(rx)}）`);
+  if (hasXui) {
+    const state = String(metrics?.xray_state || '').trim().toLowerCase() || 'unknown';
+    lines.push(`状态：${state}`);
+    lines.push(`耗尽的入站数量（禁用 ${formatDailyReportCount(metrics?.xui_inbounds_disabled)}、即将耗尽 ${formatDailyReportCount(metrics?.xui_inbounds_depleted)}）`);
+    lines.push(`耗尽的客户端数量（禁用 ${formatDailyReportCount(metrics?.xui_clients_disabled)}、即将耗尽 ${formatDailyReportCount(metrics?.xui_clients_depleted)}）`);
+  }
+  const metricsTime = Number(metrics?.timestamp) || 0;
+  if (metricsTime > 0 && now - metricsTime > DAILY_REPORT_STALE_MS) {
+    lines.push(`⚠️ 数据已过期，${messages.lastReport(formatLastReportTime(metricsTime, settings))}`);
+  }
+  return lines.join('\n');
+}
+
+export async function checkDailyReport(db, options = {}) {
+  const siteSettings = options.siteSettings ?? await loadSiteSettings(db);
+  const now = Number(options?.now || Date.now());
+
+  if (options?.scheduled && !isDailyReportTimeDue(siteSettings, now)) {
+    return false;
+  }
+  if (!hasNotificationTarget(siteSettings)) {
+    return false;
+  }
+
+  const todaySerial = getZonedDateSerial(now, siteSettings.notification_timezone);
+  if (!options?.force && Number.isFinite(todaySerial)) {
+    try {
+      const sent = await db.prepare(
+        `SELECT value FROM settings WHERE key = ?`
+      ).bind(DAILY_REPORT_SENT_KEY).first();
+      if (sent && Number(sent.value) === todaySerial) {
+        debug('[Cron] 每日报告今天已发送，跳过');
+        return false;
+      }
+    } catch (e) {
+      debug('[Cron] 读取每日报告发送标记失败，继续发送:', e?.message || e);
+    }
+  }
+
+  const messages = getNotificationMessages(siteSettings);
+  let sentAny = false;
+  try {
+    const allServers = await getAllServers(db);
+    for (const server of allServers) {
+      const metrics = await getLatestMetrics(db, server.id, server);
+      if (!metrics) {
+        debug(`[Cron] 服务器 ${server.name} 无指标数据，跳过每日报告`);
+        continue;
+      }
+      const msg = buildDailyReportMessage(server, metrics, siteSettings, now);
+      debug(`[Cron] 发送每日报告: ${server.name}`);
+      try {
+        await sendNotification(siteSettings, msg, {
+          event: messages.events.dailyReport,
+          emoji: '📊',
+          clients: [server.name],
+          count: 1,
+          message: msg
+        });
+        sentAny = true;
+      } catch (e) {
+        console.error('每日报告发送失败:', server.name, e);
+      }
+    }
+  } catch (e) {
+    console.error('每日报告生成失败:', e);
+    return false;
+  }
+
+  if (sentAny && Number.isFinite(todaySerial)) {
+    try {
+      await db.prepare(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`
+      ).bind(DAILY_REPORT_SENT_KEY, String(todaySerial)).run();
+    } catch (e) {
+      debug('[Cron] 写入每日报告发送标记失败:', e?.message || e);
+    }
+  }
+  return sentAny;
 }

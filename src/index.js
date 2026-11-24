@@ -1,5 +1,5 @@
 import { initDatabase, weeklyCleanup, getMetricsHistory, clearHistory } from './database/schema.js';
-import { checkOfflineNodes, checkExpiringServers, checkResourceAlerts } from './services/notification.js';
+import { checkOfflineNodes, checkExpiringServers, checkResourceAlerts, checkDailyReport } from './services/notification.js';
 import { updateDatabase } from './database/updateDatabase.js';
 import { handleAdminAPI } from './handlers/admin.js';
 import { serveFrontend } from './handlers/frontend.js';
@@ -430,6 +430,14 @@ export default {
         }
         const result = await clearHistory(env.DB);
         return createSuccessResponse(result);
+      }},
+      { method: 'POST', path: '/sendDailyReport', handler: async () => {
+        await ensureSiteSettings();
+        if (!await checkAuth(request, env, sys)) {
+          return simpleAuthResponse();
+        }
+        const sent = await checkDailyReport(env.DB, { force: true, now: Date.now() });
+        return createSuccessResponse({ sent });
       }}
     ];
 
@@ -489,6 +497,10 @@ export default {
         debug('[Cron] 资源负载告警检测完成');
       }
     } else if (cron === '0 * * * *') {
+      // 每日报告在 08:00（notification_timezone）发；放表轮换前面，
+      // 避免周日 00:00 UTC 轮换后最新指标表为空。
+      debug('[Cron] 检查是否到达每日报告时间');
+      await checkDailyReport(env.DB, { scheduled: true, now: now.getTime() });
       if (day === 0 && hour === 0) {
         debug('[Cron] 开始执行每周数据清理任务（表轮换）');
         await weeklyCleanup(env.DB);

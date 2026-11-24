@@ -138,7 +138,18 @@ export const HISTORY_TABLE_COLUMNS = Object.freeze([
   ['ip_v6', "TEXT DEFAULT '0'"],
   ['boot_time', "TEXT DEFAULT ''"],
   ['net_rx_monthly', 'REAL DEFAULT 0'],
-  ['net_tx_monthly', 'REAL DEFAULT 0']
+  ['net_tx_monthly', 'REAL DEFAULT 0'],
+  // x-ui 面板字段（探针接手面板日报用，agent 1.1.3-jegan.1 起上报）
+  ['hostname', "TEXT DEFAULT ''"],
+  ['panel_version', "TEXT DEFAULT ''"],
+  ['xray_version', "TEXT DEFAULT ''"],
+  ['xray_state', "TEXT DEFAULT ''"],
+  ['online_clients', 'INTEGER DEFAULT 0'],
+  ['online_client_emails', "TEXT DEFAULT ''"],
+  ['xui_inbounds_disabled', 'INTEGER DEFAULT 0'],
+  ['xui_inbounds_depleted', 'INTEGER DEFAULT 0'],
+  ['xui_clients_disabled', 'INTEGER DEFAULT 0'],
+  ['xui_clients_depleted', 'INTEGER DEFAULT 0']
 ]);
 
 export const HISTORY_INSERT_COLUMNS = Object.freeze(

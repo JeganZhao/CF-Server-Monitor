@@ -11,7 +11,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: '月流量告警',
       expiring: '服务器到期提醒',
       renewed: '服务器自动续费成功',
-      test: '测试通知'
+      test: '测试通知',
+      dailyReport: '定时报告'
     },
     metrics: { netIn: '下行网速', netOut: '上行网速', netTotal: '总网速', tcpConn: 'TCP 连接数', udpConn: 'UDP 连接数' },
     invalidTime: '无效时间',
@@ -33,7 +34,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: '月流量告警',
       expiring: '伺服器到期提醒',
       renewed: '伺服器自動續費成功',
-      test: '測試通知'
+      test: '測試通知',
+      dailyReport: '定時報告'
     },
     metrics: { netIn: '下行網速', netOut: '上行網速', netTotal: '總網速', tcpConn: 'TCP 連線數', udpConn: 'UDP 連線數' },
     invalidTime: '無效時間',
@@ -55,7 +57,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: 'Monthly Traffic Alert',
       expiring: 'Server Expiration Reminder',
       renewed: 'Server Auto-Renewed',
-      test: 'Test Notification'
+      test: 'Test Notification',
+      dailyReport: 'Daily Report'
     },
     metrics: { netIn: 'Download Speed', netOut: 'Upload Speed', netTotal: 'Total Speed', tcpConn: 'TCP Connections', udpConn: 'UDP Connections' },
     invalidTime: 'Invalid time',
@@ -77,7 +80,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: '月間トラフィックアラート',
       expiring: 'サーバー有効期限リマインダー',
       renewed: 'サーバー自動更新完了',
-      test: 'テスト通知'
+      test: 'テスト通知',
+      dailyReport: '定期レポート'
     },
     metrics: { netIn: '下り速度', netOut: '上り速度', netTotal: '合計速度', tcpConn: 'TCP 接続数', udpConn: 'UDP 接続数' },
     invalidTime: '無効な時刻',
@@ -99,7 +103,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: 'Peringatan Trafik Bulanan',
       expiring: 'Pengingat Kedaluwarsa Server',
       renewed: 'Server Diperpanjang Otomatis',
-      test: 'Notifikasi Uji'
+      test: 'Notifikasi Uji',
+      dailyReport: 'Laporan Harian'
     },
     metrics: { netIn: 'Kecepatan Unduh', netOut: 'Kecepatan Unggah', netTotal: 'Kecepatan Total', tcpConn: 'Koneksi TCP', udpConn: 'Koneksi UDP' },
     invalidTime: 'Waktu tidak valid',
@@ -121,7 +126,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: 'Alerte de trafic mensuel',
       expiring: 'Rappel d’expiration du serveur',
       renewed: 'Serveur renouvelé automatiquement',
-      test: 'Notification de test'
+      test: 'Notification de test',
+      dailyReport: 'Rapport quotidien'
     },
     metrics: { netIn: 'Débit descendant', netOut: 'Débit montant', netTotal: 'Débit total', tcpConn: 'Connexions TCP', udpConn: 'Connexions UDP' },
     invalidTime: 'Heure invalide',
@@ -143,7 +149,8 @@ const NOTIFICATION_MESSAGES = {
       trafficAlert: 'Alerta de tráfico mensual',
       expiring: 'Recordatorio de vencimiento del servidor',
       renewed: 'Servidor renovado automáticamente',
-      test: 'Notificación de prueba'
+      test: 'Notificación de prueba',
+      dailyReport: 'Informe diario'
     },
     metrics: { netIn: 'Velocidad de descarga', netOut: 'Velocidad de subida', netTotal: 'Velocidad total', tcpConn: 'Conexiones TCP', udpConn: 'Conexiones UDP' },
     invalidTime: 'Hora inválida',
